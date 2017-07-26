@@ -1,0 +1,176 @@
+buildscript {
+  repositories {
+    jcenter()
+  }
+  dependencies {
+    classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.3'
+    classpath 'org.jsoup:jsoup:1.10.3'
+    classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.1.3-2'
+  }
+}
+
+group 'info.jdavid.okio'
+version '1.0.0'
+
+apply plugin: 'java'
+apply plugin: 'kotlin'
+apply plugin: 'jacoco'
+apply plugin: 'maven-publish'
+apply plugin: 'com.jfrog.bintray'
+apply plugin: 'idea'
+
+repositories {
+  jcenter()
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+println "Java version: ${System.getProperty('java.version')}"
+
+ext {
+  bintrayApiKey = new File("$projectDir/local.properties").with {
+    it.text.splitEachLine('=', { if (it && it[0] == 'bintrayApiKey') return it[1] })
+  }
+  jdkVersion = Runtime.class.getPackage().getImplementationVersion()?.
+    replaceFirst('1\\.([78])\\.0_([0-9]+)', '$1.$2')
+  println jdkVersion
+}
+
+dependencies {
+  compile 'com.squareup.okio:okio:1.13.0'
+  compile 'org.jetbrains.kotlin:kotlin-stdlib'
+  compile 'org.jetbrains.kotlinx:kotlinx-coroutines-core:0.16'
+  compile 'org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.16'
+
+  testCompile 'junit:junit:4.12'
+}
+
+jacoco {
+  reportsDir = file("$buildDir/jacoco/reports")
+}
+
+jacocoTestReport {
+  reports {
+    xml.enabled true
+    csv.enabled false
+    html.enabled true
+  }
+}
+
+kotlin {
+  experimental {
+    coroutines 'enable'
+  }
+  compileKotlin {
+   kotlinOptions {
+      jdkVersion = '1.8'
+    }
+  }
+}
+
+test {
+  if (jdkVersion == null) {
+    jvmArgs '-XX:+IgnoreUnrecognizedVMOptions'
+    jvmArgs '--permit-illegal-access'
+    jvmArgs '--show-version'
+  }
+  testLogging {
+    showStandardStreams = true
+  }
+  jacoco {
+    append = false
+    destinationFile = file("$buildDir/jacoco/jacocoTest.exec")
+    classDumpDir = file("$buildDir/jacoco/classpathdumps")
+  }
+  doLast {
+    File html = reports.html.entryPoint
+    def doc = org.jsoup.Jsoup.parse(html, 'UTF-8')
+    int total = doc.select('#tests > .counter').text() as int
+    int failed = doc.select('#failures > .counter').text() as int
+
+    def readme = file('README.md')
+    def badge = { String label, String text, String color ->
+      "https://img.shields.io/badge/_${label}_-_${text}-${color}.png?style=flat"
+    }
+    String label = 'Tests'
+    String text = "${total-failed}/${total}"
+    String color = failed == 0 ? 'green' : (failed < 3 ? 'yellow' : 'red')
+    String v = project.version
+    def download =
+      "https://bintray.com/artifact/download/programingjd/maven/info/jdavid/" +
+      "okio/kotlin-suspend/$v/kotlin-suspend-${v}.jar"
+    readme.readLines().withIndex().collect { line, i ->
+      switch (i) {
+        case 0:
+          return "![jcenter](${badge('jcenter',v,'6688ff')}) &#x2003; ![jcenter](${badge(label,text,color)})"
+        case 9: return "[Download](${download}) the latest jar."
+        case 19: return "  <version>${v}</version>"
+        case 32: return "  compile 'info.jdavid.okio:kotlin-suspend:${v}'"
+        default: return line
+      }
+    }.join('\n').with { readme.text = it }
+  }
+  finalizedBy tasks.jacocoTestReport
+//  outputs.upToDateWhen { false }
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+  classifier = 'javadoc'
+  from javadoc.destinationDir
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+  classifier = 'sources'
+  from sourceSets.main.allSource
+}
+
+artifacts {
+  archives sourcesJar, javadocJar
+}
+
+publishing {
+  publications {
+    mavenJava(MavenPublication) {
+      groupId project.group
+      artifactId 'kotlin-suspend'
+      from components.java
+      artifact sourcesJar
+      artifact javadocJar
+    }
+  }
+  repositories {
+    maven {
+      url "$buildDir/repo"
+    }
+  }
+}
+
+
+bintray {
+  user = 'programingjd'
+  key = bintrayApiKey
+  dryRun = false
+  publish = true
+  publications = ['mavenJava']
+  pkg {
+    repo = 'maven'
+    name = 'info.jdavid.okio'
+    websiteUrl = 'https://github.com/programingjd/okio-kotlin-suspend'
+    issueTrackerUrl = 'https://github.com/programingjd/okio-kotlin-suspend/issues'
+    vcsUrl = 'https://github.com/programingjd/okio-kotlin-suspend.git'
+    githubRepo = 'programingjd/okio-kotlin-suspend'
+    githubReleaseNotesFile = 'README.md'
+    licenses = ['Apache-2.0']
+    labels = ['okio','kotlin','suspend','coroutines']
+    publicDownloadNumbers = true
+    version {
+      name = project.version
+      mavenCentralSync {
+        sync = false
+      }
+    }
+  }
+}
+
+tasks.bintrayUpload.dependsOn tasks.check
