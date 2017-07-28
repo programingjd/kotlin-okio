@@ -38,7 +38,7 @@ ext {
 }
 
 dependencies {
-  compile 'com.squareup.okio:okio:1.13.0'
+  //compile 'com.squareup.okio:okio:1.13.0'
   compile 'org.jetbrains.kotlin:kotlin-stdlib'
   compile 'org.jetbrains.kotlinx:kotlinx-coroutines-core:0.16'
   compile 'org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.16'
