@@ -117,6 +117,24 @@ interface BufferedSource: Source {
   @Throws(IOException::class)
   suspend fun aReadAll(sink: Sink): Long
 
+  @Throws(IOException::class)
+  fun indexOf(b: Byte): Long
+
+  @Throws(IOException::class)
+  suspend fun aIndexOf(b: Byte): Long
+
+  @Throws(IOException::class)
+  fun indexOf(b: Byte, from: Long): Long
+
+  @Throws(IOException::class)
+  suspend fun aIndexOf(b: Byte, from: Long): Long
+
+  @Throws(IOException::class)
+  fun indexOf(b: Byte, from: Long, to: Long): Long
+
+  @Throws(IOException::class)
+  suspend fun aIndexOf(b: Byte, from: Long, to: Long): Long
+
   fun inputStream(): InputStream
 
 }

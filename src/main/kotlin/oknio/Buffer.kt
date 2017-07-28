@@ -94,12 +94,13 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
       s = s.next ?: throw NullPointerException()
     }
     var count = byteCount
-    while (count > 0) {
+    while (count > 0L) {
       val pos = s.pos + off
       val toCopy = Math.min(s.limit - pos, count)
       output.write(s.data.array(), pos.toInt(), toCopy.toInt())
       count -= toCopy
       off = 0
+      if (count > 0L)  s = s.next ?: throw NullPointerException()
     }
     return this
   }
@@ -115,7 +116,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
       s = s.next ?: throw NullPointerException()
     }
     var count = byteCount
-    while (count > 0) {
+    while (count > 0L) {
       val copy = Segment(s)
       copy.pos += off.toInt()
       copy.limit = Math.min(copy.pos + count.toInt(), copy.limit)
@@ -125,13 +126,17 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
         output.head = copy.next
       }
       else {
-        output.head!!.prev!!.push(copy)
+        ((output.head ?: throw NullPointerException()).prev ?: throw NullPointerException()).push(copy)
       }
       count -= copy.limit - copy.pos
       off = 0
+      if (count > 0L) s = s.next ?: throw NullPointerException()
     }
     return this
   }
+
+  @Throws(IOException::class)
+  fun writeTo(output: OutputStream) = writeTo(output, size)
 
   @Throws(IOException::class)
   fun writeTo(output: OutputStream, byteCount: Long): Buffer {
@@ -146,9 +151,10 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
       count -= toCopy
       if (s.pos == s.limit) {
         val toRecycle = s
-        s = toRecycle.pop() ?: throw NullPointerException()
-        this.head = s
+        val s2 = toRecycle.pop()
+        this.head = s2
         SegmentPool.recycle(toRecycle)
+        if (count > 0L) s = s2 ?: throw NullPointerException()
       }
     }
     return this
@@ -216,12 +222,13 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
 
   fun getByte(pos: Long): Byte {
     checkOffsetAndCount(size, pos, 1L)
-    val s = head ?: throw NullPointerException()
+    var s = head ?: throw NullPointerException()
     var p = pos
     while (true) {
       val segmentByteCount = s.limit - s.pos
       if (p < segmentByteCount) return s.data[s.pos + p.toInt()]
       p -= segmentByteCount
+      s = s.next ?: throw NullPointerException()
     }
   }
 
@@ -444,7 +451,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
 
   suspend override fun aWrite(source: ByteArray) = aWrite(source, 0, source.size)
 
-  override fun write(source: ByteArray, offset: Int, byteCount: Int): BufferedSink {
+  override fun write(source: ByteArray, offset: Int, byteCount: Int): Buffer {
     checkOffsetAndCount(source.size, offset, byteCount)
     val limit = offset + byteCount
     var off = offset
@@ -482,7 +489,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     return totalBytesRead
   }
 
-  override fun write(source: Source, byteCount: Long): BufferedSink {
+  override fun write(source: Source, byteCount: Long): Buffer {
     var count = byteCount
     while (count > 0L) {
       val read = source.read(this, count)
@@ -492,7 +499,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     return this
   }
 
-  suspend override fun aWrite(source: Source, byteCount: Long): BufferedSink {
+  suspend override fun aWrite(source: Source, byteCount: Long): Buffer {
     var count = byteCount
     while (count > 0L) {
       val read = source.aRead(this, count)
@@ -502,7 +509,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     return this
   }
 
-  override fun writeByte(b: Int): BufferedSink {
+  override fun writeByte(b: Int): Buffer {
     val tail = writableSegment(1)
     tail.data.array()[tail.limit++] = b.toByte()
     size += 1
@@ -515,7 +522,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
 
   suspend override fun aWriteUtf8(string: String) = aWriteUtf8(string, 0, string.length)
 
-  override fun writeUtf8(string: String, beginIndex: Int, endIndex: Int): BufferedSink {
+  override fun writeUtf8(string: String, beginIndex: Int, endIndex: Int): Buffer {
     if (beginIndex < 0) throw IllegalArgumentException("beginIndex < 0: ${beginIndex}")
     if (endIndex < beginIndex) {
       throw IllegalArgumentException("endIndex < beginIndex: ${endIndex} < ${beginIndex}")
@@ -570,7 +577,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     return this
   }
 
-  suspend override fun aWriteUtf8(string: String, beginIndex: Int, endIndex: Int): BufferedSink {
+  suspend override fun aWriteUtf8(string: String, beginIndex: Int, endIndex: Int): Buffer {
     if (beginIndex < 0) throw IllegalArgumentException("beginIndex < 0: ${beginIndex}")
     if (endIndex < beginIndex) {
       throw IllegalArgumentException("endIndex < beginIndex: ${endIndex} < ${beginIndex}")
@@ -625,7 +632,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     return this
   }
 
-  override fun writeUtf8CodePoint(codePoint: Int): BufferedSink {
+  override fun writeUtf8CodePoint(codePoint: Int): Buffer {
     if (codePoint < 0x80) {
       writeByte(codePoint)
     }
@@ -655,7 +662,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     return this
   }
 
-  suspend override fun aWriteUtf8CodePoint(codePoint: Int): BufferedSink {
+  suspend override fun aWriteUtf8CodePoint(codePoint: Int): Buffer {
     if (codePoint < 0x80) {
       aWriteByte(codePoint)
     }
@@ -690,7 +697,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
   suspend override fun aWriteString(string: String,
                                     charset: Charset) = aWriteString(string, 0, string.length, charset)
 
-  override fun writeString(string: String, beginIndex: Int, endIndex: Int, charset: Charset): BufferedSink {
+  override fun writeString(string: String, beginIndex: Int, endIndex: Int, charset: Charset): Buffer {
     if (beginIndex < 0) throw IllegalArgumentException("beginIndex < 0: ${beginIndex}")
     if (endIndex < beginIndex) {
       throw IllegalArgumentException("endIndex < beginIndex: ${endIndex} < ${beginIndex}")
@@ -704,7 +711,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
   }
 
   suspend override fun aWriteString(string: String, beginIndex: Int, endIndex: Int,
-                                    charset: Charset): BufferedSink {
+                                    charset: Charset): Buffer {
     if (beginIndex < 0) throw IllegalArgumentException("beginIndex < 0: ${beginIndex}")
     if (endIndex < beginIndex) {
       throw IllegalArgumentException("endIndex < beginIndex: ${endIndex} < ${beginIndex}")
@@ -819,6 +826,55 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     return byteCount
   }
 
+  override fun indexOf(b: Byte) = indexOf(b, 0L, Long.MAX_VALUE)
+
+  suspend override fun aIndexOf(b: Byte) = aIndexOf(b, 0L, Long.MAX_VALUE)
+
+  override fun indexOf(b: Byte, from: Long) = indexOf(b, from, Long.MAX_VALUE)
+
+  suspend override fun aIndexOf(b: Byte, from: Long) = aIndexOf(b, from, Long.MAX_VALUE)
+
+  override fun indexOf(b: Byte, from: Long, to: Long): Long {
+    if (from < 0 || to < from) throw IllegalArgumentException("size=${size} fromIndex=${from} toIndex=${to}")
+    val to2 = if (to > size) size else to
+    if (from == to) return -1L
+    var s = head ?: return -1L
+    var offset: Long
+    if (size - from < from) {
+      offset = size
+      while (offset > from) {
+        s = s.prev ?: throw NullPointerException()
+        offset -= s.limit - s.pos
+      }
+    }
+    else {
+      offset = 0L
+      var nextOffset = offset + s.limit - s.pos
+      while (nextOffset < from) {
+        s = s.next ?: throw NullPointerException()
+        offset = nextOffset
+        nextOffset = offset + s.limit - s.pos
+      }
+    }
+    var from2 = from
+    while (offset < to2) {
+      val data = s.data
+      var pos = (s.pos + from2 - offset).toInt()
+      while (pos < Math.min(s.limit.toLong(), s.pos + to - offset).toInt()) {
+        if (data[pos] == b) {
+          return pos - s.pos + offset
+        }
+        ++pos
+      }
+      offset += s.limit - s.pos
+      from2 = offset
+      if (offset < to2) s = s.next ?: throw NullPointerException()
+    }
+    return -1L
+  }
+
+  suspend override fun aIndexOf(b: Byte, from: Long, to: Long) = indexOf(b, from, to)
+
   override fun close() {}
 
   suspend override fun aClose() {}
@@ -871,7 +927,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
         result = 31 * result + s.data[pos]
       }
       s = s.next ?: throw NullPointerException()
-      if (s != head) break
+      if (s == head) break
     }
     return result
   }
@@ -892,7 +948,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
       if (s.limit == s.pos) throw AssertionError("s.limit == s.pos")
       offset += s.limit - s.pos
       ++segmentCount
-      s = s.next ?: throw NullPointerException()
+      if (offset < byteCount) s = s.next ?: throw NullPointerException()
     }
     val segments = Array<ByteArray?>(segmentCount, { null })
     val directory = IntArray(segmentCount * 2)
@@ -907,7 +963,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
       directory[segmentCount + segments.size] = s.pos
       s.shared = true
       ++segmentCount
-      s = s.next ?: throw NullPointerException()
+      if (offset < byteCount) s = s.next ?: throw NullPointerException()
     }
     offset = 0
     segmentCount = segments.size
@@ -921,7 +977,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     return result
   }
 
-  override fun clone(): Buffer {
+  override public fun clone(): Buffer {
     val result = Buffer()
     if (size == 0L) return result
     val head = head ?: throw NullPointerException()
@@ -929,9 +985,10 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     resultHead.prev = resultHead
     resultHead.next = resultHead
     result.head = resultHead
-    val s = head.next ?: throw NullPointerException()
+    var s = head.next ?: throw NullPointerException()
     while (s != head) {
-      result.head!!.prev!!.push(Segment(s))
+      ((result.head ?: throw NullPointerException()).prev ?: throw NullPointerException()).push(Segment(s))
+      s = s.next ?: throw NullPointerException()
     }
     result.size = size
     return result
