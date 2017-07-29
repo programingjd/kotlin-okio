@@ -1,6 +1,9 @@
 package oknio
 
 import java.nio.ByteBuffer
+import java.nio.charset.Charset
+import java.security.MessageDigest
+import java.security.NoSuchAlgorithmException
 import java.util.*
 
 
@@ -74,6 +77,14 @@ class ByteString internal constructor(private val data: ByteArray): Comparable<B
       throw IllegalArgumentException("Unexpected hex digit: ${c}")
     }
 
+    fun encodeUtf8(s: String): ByteString {
+      return ByteString(s.toByteArray(UTF_8))
+    }
+
+    fun encodeString(s: String, charset: Charset): ByteString {
+      return ByteString(s.toByteArray(charset))
+    }
+
   }
 
   fun hex(): String {
@@ -86,8 +97,46 @@ class ByteString internal constructor(private val data: ByteArray): Comparable<B
     return String(result)
   }
 
+  fun toAsciiLowercase(): ByteString {
+    for (i in 0 until data.size) {
+      var c = data[i]
+      if (c < 'A'.toByte() || c > 'Z'.toByte()) {
+        continue
+      }
+      val lowercase = data.clone()
+      lowercase[i] = (c - ('A' - 'a')).toByte()
+      for (j in i+1 until lowercase.size) {
+        c = lowercase[j]
+        if (c > 'A'.toByte() && c < 'Z'.toByte()) {
+          lowercase[j] = (c - ('A' - 'a')).toByte()
+        }
+      }
+      return ByteString(lowercase)
+    }
+    return this
+  }
+
+  fun toAsciiUppercase(): ByteString {
+    for (i in 0 until data.size) {
+      var c = data[i]
+      if (c < 'a'.toByte() || c > 'z'.toByte()) {
+        continue
+      }
+      val uppercase = data.clone()
+      uppercase[i] = (c - ('a' - 'A')).toByte()
+      for (j in i+1 until uppercase.size) {
+        c = uppercase[j]
+        if (c > 'a'.toByte() && c < 'z'.toByte()) {
+          uppercase[j] = (c - ('a' - 'A')).toByte()
+        }
+      }
+      return ByteString(uppercase)
+    }
+    return this
+  }
+
   fun substring(beginIndex: Int, endIndex: Int = data.size): ByteString {
-    if (beginIndex <= 0) throw IllegalArgumentException("beginIndex < 0")
+    if (beginIndex < 0) throw IllegalArgumentException("beginIndex < 0")
     if (endIndex > data.size) throw IllegalArgumentException("endIndex > length(${data.size})")
     val subLen = endIndex - beginIndex
     if (subLen < 0) throw IllegalArgumentException("endIndex < beginIndex")
@@ -121,6 +170,37 @@ class ByteString internal constructor(private val data: ByteArray): Comparable<B
     return offset >= 0 && offset <= data.size - byteCount &&
       otherOffset >= 0 && otherOffset <= other.size - byteCount &&
       arrayRangeEquals(data, offset, other, otherOffset, byteCount)
+  }
+
+  fun rangeEquals(offset: Int, other: ByteString, otherOffset: Int, byteCount: Int): Boolean {
+    return other.rangeEquals(otherOffset, this.data, offset, byteCount)
+  }
+
+  fun startsWith(prefix: ByteArray) = rangeEquals(0, prefix, 0, prefix.size)
+
+  fun startsWith(prefix: ByteString) = rangeEquals(0, prefix, 0, prefix.size())
+
+  fun endsWith(suffix: ByteArray): Boolean {
+    return rangeEquals(size() - suffix.size, suffix, 0, suffix.size)
+  }
+
+  fun endsWith(suffix: ByteString): Boolean {
+    return rangeEquals(size() - suffix.size(), suffix, 0, suffix.size())
+  }
+
+  fun indexOf(other: ByteString, fromIndex: Int = 0) = indexOf(other.internalArray(), fromIndex)
+
+  fun indexOf(other: ByteArray, fromIndex: Int = 0): Int {
+    val from = Math.max(fromIndex, 0)
+    val limit = data.size - other.size
+    return (from..limit).firstOrNull { arrayRangeEquals(data, it, other, 0, other.size) } ?: -1
+  }
+
+  fun lastIndexOf(other: ByteString, fromIndex: Int = size()) = lastIndexOf(other.internalArray(), fromIndex)
+
+  fun lastIndexOf(other: ByteArray, fromIndex: Int = size()): Int {
+    val from = Math.min(fromIndex, data.size - other.size)
+    return (0..from).lastOrNull { arrayRangeEquals(data, it, other, 0, other.size) } ?: -1
   }
 
   override fun equals(other: Any?): Boolean {
@@ -164,6 +244,27 @@ class ByteString internal constructor(private val data: ByteArray): Comparable<B
 
   suspend internal fun aWrite(buffer: Buffer) {
     buffer.aWrite(data, 0, data.size)
+  }
+
+  fun utf8() = utf8
+
+  fun string(charset: Charset) = String(data, charset)
+
+  fun md5() = digest("MD5")
+
+  fun sha1() = digest("SHA-1")
+
+  fun sha256() = digest("SHA-256")
+
+  fun sha512() = digest("SHA-512")
+
+  private fun digest(algorithm: String): ByteString {
+    try {
+      return ByteString.of(MessageDigest.getInstance(algorithm).digest(data))
+    }
+    catch (e: NoSuchAlgorithmException) {
+      throw AssertionError(e)
+    }
   }
 
 }
