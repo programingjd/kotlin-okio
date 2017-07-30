@@ -97,7 +97,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     while (count > 0L) {
       val pos = s.pos + off
       val toCopy = Math.min(s.limit - pos, count)
-      output.write(s.data.array(), pos.toInt(), toCopy.toInt())
+      output.write(s.data, pos.toInt(), toCopy.toInt())
       count -= toCopy
       off = 0
       if (count > 0L)  s = s.next ?: throw NullPointerException()
@@ -145,7 +145,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     var count = byteCount
     while (count > 0L) {
       val toCopy = Math.min(count, (s.limit - s.pos).toLong()).toInt()
-      output.write(s.data.array(), s.pos, toCopy)
+      output.write(s.data, s.pos, toCopy)
       s.pos += toCopy
       size -= toCopy
       count -= toCopy
@@ -178,7 +178,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     while (count > 0L || forever) {
       val tail = writableSegment(1)
       val maxToCopy = Math.min(count, (Segment.SIZE - tail.limit).toLong()).toInt()
-      val bytesRead = input.read(tail.data.array(), tail.limit, maxToCopy)
+      val bytesRead = input.read(tail.data, tail.limit, maxToCopy)
       if (bytesRead == -1) {
         if (forever) return
         throw EOFException()
@@ -286,7 +286,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     checkOffsetAndCount(sink.size, offset, byteCount)
     val s = head ?: return -1
     val toCopy = Math.min(byteCount, s.limit - s.pos)
-    System.arraycopy(s.data.array(), s.pos, sink, offset, toCopy)
+    System.arraycopy(s.data, s.pos, sink, offset, toCopy)
     s.pos += toCopy
     size -= toCopy
     if (s.pos == s.limit) {
@@ -389,7 +389,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     if (s.pos + byteCount > s.limit) {
       return String(readByteArray(byteCount), charset)
     }
-    val result = String(s.data.array(), s.pos, byteCount.toInt(), charset)
+    val result = String(s.data, s.pos, byteCount.toInt(), charset)
     s.pos += byteCount.toInt()
     size -= byteCount
     if (s.pos == s.limit) {
@@ -409,7 +409,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     if (s.pos + byteCount > s.limit) {
       return String(aReadByteArray(byteCount), charset)
     }
-    val result = String(s.data.array(), s.pos, byteCount.toInt(), charset)
+    val result = String(s.data, s.pos, byteCount.toInt(), charset)
     s.pos += byteCount.toInt()
     size -= byteCount
     if (s.pos == s.limit) {
@@ -458,7 +458,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     while (off < limit) {
       val tail = writableSegment(1)
       val toCopy = Math.min(limit - off, Segment.SIZE - tail.limit)
-      System.arraycopy(source, off, tail.data.array(), tail.limit, toCopy)
+      System.arraycopy(source, off, tail.data, tail.limit, toCopy)
       off += toCopy
       tail.limit += toCopy
     }
@@ -511,7 +511,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
 
   override fun writeByte(b: Int): Buffer {
     val tail = writableSegment(1)
-    tail.data.array()[tail.limit++] = b.toByte()
+    tail.data[tail.limit++] = b.toByte()
     size += 1
     return this
   }
@@ -535,7 +535,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
       var c = string[i].toInt()
       if (c < 0x80) {
         val tail = writableSegment(1)
-        val data = tail.data.array()
+        val data = tail.data
         val segmentOffset = tail.limit - i
         val runLimit = Math.min(endIndex, Segment.SIZE - segmentOffset)
         data[segmentOffset + i++] = c.toByte()
@@ -590,7 +590,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
       var c = string[i].toInt()
       if (c < 0x80) {
         val tail = writableSegment(1)
-        val data = tail.data.array()
+        val data = tail.data
         val segmentOffset = tail.limit - i
         val runLimit = Math.min(endIndex, Segment.SIZE - segmentOffset)
         data[segmentOffset + i++] = c.toByte()
@@ -956,7 +956,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     segmentCount = 0
     s = head ?: throw NullPointerException()
     while (offset < byteCount) {
-      segments[segmentCount] = s.data.array()
+      segments[segmentCount] = s.data
       offset += s.limit - s.pos
       if (offset > byteCount) offset = byteCount.toInt()
       directory[segmentCount] = offset

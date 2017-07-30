@@ -26,7 +26,7 @@ class ByteStringTest {
           val buffer = Buffer()
           for(i in 0 until source.size()) {
             val segment = buffer.writableSegment(Segment.SIZE)
-            segment.data.array()[segment.pos] = source.getByte(i)
+            segment.data[segment.pos] = source.getByte(i)
             ++segment.limit
             ++buffer.size
           }

@@ -82,7 +82,9 @@ class SegmentSharingTest {
 
   @Test
   fun concatenateSegmentsCanCombine() {
-    val bufferA = Buffer().writeUtf8(ys).writeUtf8(us)
+    val bufferA = Buffer()
+    bufferA.writeUtf8(ys)
+    bufferA.writeUtf8(us)
     assertEquals(ys, bufferA.readUtf8(ys.length.toLong()))
     val bufferB = Buffer().writeUtf8(vs).writeUtf8(ws)
     val bufferC = bufferA.clone()
