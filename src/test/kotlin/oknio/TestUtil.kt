@@ -41,3 +41,64 @@ fun bufferWithRandomSegmentLayout(dice: Random, data: ByteArray): Buffer {
   }
   return result
 }
+
+fun assertEquivalent(b1: ByteString, b2: ByteString) {
+  assertTrue(b1 == b2)
+  assertTrue(b1 == b1)
+  assertTrue(b2 == b1)
+  assertEquals(b1.hashCode(), b2.hashCode())
+  assertEquals(b1.hashCode(), b1.hashCode())
+  assertEquals(b1.toString(), b2.toString())
+  assertEquals(b1.size(), b2.size())
+  val b2Bytes = b2.toByteArray()
+  for (i in b2Bytes.indices) {
+    val b = b2Bytes[i]
+    assertEquals(b, b1.getByte(i))
+  }
+  assertByteArraysEquals(b1.toByteArray(), b2Bytes)
+  assertNotNull(b1)
+  assertFalse(b1 == Any())
+  if (b2Bytes.isNotEmpty()) {
+    val b3Bytes = b2Bytes.clone()
+    ++b3Bytes[b3Bytes.size - 1]
+    val b3 = ByteString(b3Bytes)
+    assertFalse(b1 == b3)
+    assertFalse(b1.hashCode() == b3.hashCode())
+  }
+  else {
+    val b3 = ByteString.encodeUtf8("a")
+    assertFalse(b1 == b3)
+    assertFalse(b1.hashCode() == b3.hashCode())
+  }
+}
+
+fun assertEquivalent(b1: Buffer, b2: Buffer) {
+  assertTrue(b1 == b2)
+  assertTrue(b1 == b1)
+  assertTrue(b2 == b1)
+  assertEquals(b1.hashCode(), b2.hashCode())
+  assertEquals(b1.hashCode(), b1.hashCode())
+  assertEquals(b1.toString(), b2.toString())
+  assertEquals(b1.size(), b2.size())
+  val buffer = Buffer()
+  b2.copyTo(buffer, 0, b2.size)
+  val b2Bytes = b2.readByteArray()
+  for (i in b2Bytes.indices) {
+    val b = b2Bytes[i]
+    assertEquals(b, b1.getByte(i.toLong()))
+  }
+  assertNotNull(b1)
+  assertFalse(b1 == Any())
+  if (b2Bytes.isNotEmpty()) {
+    val b3Bytes = b2Bytes.clone()
+    ++b3Bytes[b3Bytes.size - 1]
+    val b3 = Buffer().write(b3Bytes)
+    assertFalse(b1 == b3)
+    assertFalse(b1.hashCode() == b3.hashCode())
+  }
+  else {
+    val b3 = Buffer().writeUtf8("a")
+    assertFalse(b1 == b3)
+    assertFalse(b1.hashCode() == b3.hashCode())
+  }
+}
