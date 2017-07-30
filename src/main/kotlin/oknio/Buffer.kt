@@ -457,7 +457,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     var off = offset
     while (off < limit) {
       val tail = writableSegment(1)
-      val toCopy = Math.min(limit - offset, Segment.SIZE - tail.limit)
+      val toCopy = Math.min(limit - off, Segment.SIZE - tail.limit)
       System.arraycopy(source, off, tail.data.array(), tail.limit, toCopy)
       off += toCopy
       tail.limit += toCopy
