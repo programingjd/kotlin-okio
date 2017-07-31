@@ -10,7 +10,7 @@ internal class Segment private constructor(val data: ByteArray,
                                            internal var owner: Boolean) {
   constructor(): this(ByteArray(SIZE), 0, 0, false, true)
   constructor(data: ByteArray, pos: Int, limit: Int): this(data, pos, limit, true, false)
-  constructor(shareFrom: Segment): this(shareFrom.data, shareFrom.pos, shareFrom.limit, true, false)
+  constructor(shareFrom: Segment): this(shareFrom.data, shareFrom.pos, shareFrom.limit, c(shareFrom), false)
 
   val buffer = ByteBuffer.wrap(data)
   var next: Segment? = null
@@ -20,6 +20,11 @@ internal class Segment private constructor(val data: ByteArray,
 
     val SIZE = 8192
     val SHARE_MINIMUM = 1024
+
+    private fun c(shareFrom: Segment): Boolean {
+      shareFrom.shared = true
+      return true
+    }
 
   }
 

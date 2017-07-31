@@ -933,7 +933,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
   }
 
   override fun toString(): String {
-    return ByteString(toByteArray()) .toString()
+    return ByteString(toByteArray()).toString()
   }
 
   internal fun toByteArray() = toByteArray(size)

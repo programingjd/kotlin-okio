@@ -1,4 +1,4 @@
-![jcenter](https://img.shields.io/badge/_jcenter_-_1.0.0-6688ff.png?style=flat) &#x2003; ![jcenter](https://img.shields.io/badge/_Tests_-_1/1-green.png?style=flat)
+![jcenter](https://img.shields.io/badge/_jcenter_-_1.0.0-6688ff.png?style=flat) &#x2003; ![jcenter](https://img.shields.io/badge/_Tests_-_131/131-green.png?style=flat)
 # okio-kotlin-suspend
 [Okio](https://github.com/square/okio) extensions that adds suspendable methods for use with kotlin coroutines.
 
