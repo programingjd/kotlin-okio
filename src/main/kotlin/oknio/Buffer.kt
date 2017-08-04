@@ -751,7 +751,7 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
   }
 
   override fun write(source: Buffer, byteCount: Long) {
-    if (source == this) throw IllegalArgumentException("source == this")
+    if (source === this) throw IllegalArgumentException("source == this")
     checkOffsetAndCount(source.size, 0L, byteCount)
     var count = byteCount
     while (count > 0L) {

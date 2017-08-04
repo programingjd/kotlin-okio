@@ -3,7 +3,7 @@ package oknio
 import java.nio.charset.Charset
 
 internal fun checkOffsetAndCount(size: Long, offset: Long, byteCount: Long) {
-  if (offset.or(byteCount) < 0 || offset > size || size - offset < byteCount) {
+  if (offset.or(byteCount) < 0L || offset > size || size - offset < byteCount) {
     throw ArrayIndexOutOfBoundsException("size=${size} offset=${offset} bytecount=${byteCount}")
   }
 }

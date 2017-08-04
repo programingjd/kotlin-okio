@@ -146,7 +146,7 @@ internal class RealBufferedSink(val sink: Sink) : BufferedSink {
 
   override fun write(source: Source, byteCount: Long): BufferedSink {
     var count = byteCount
-    while (byteCount > 0L) {
+    while (count > 0L) {
       val read = source.read(buffer, count)
       if (read == -1L) throw EOFException()
       count -= read
@@ -157,7 +157,7 @@ internal class RealBufferedSink(val sink: Sink) : BufferedSink {
 
   suspend override fun aWrite(source: Source, byteCount: Long): BufferedSink {
     var count = byteCount
-    while (byteCount > 0L) {
+    while (count > 0L) {
       val read = source.aRead(buffer, count)
       if (read == -1L) throw EOFException()
       count -= read

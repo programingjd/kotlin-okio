@@ -68,7 +68,7 @@ internal class Segment private constructor(val data: ByteArray,
 
   fun compact() {
     val prev = prev ?: throw NullPointerException()
-    if (prev == this) throw IllegalStateException()
+    if (prev === this) throw IllegalStateException()
     if (!prev.owner) return
     val byteCount = limit - pos
     val availableByteCount = SIZE - prev.limit + (if (prev.shared) 0 else prev.pos)
