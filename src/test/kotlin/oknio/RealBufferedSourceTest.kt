@@ -1,5 +1,6 @@
 package oknio
 
+import kotlinx.coroutines.experimental.runBlocking
 import java.io.EOFException
 import java.io.IOException
 import org.junit.Test
@@ -54,16 +55,53 @@ class RealBufferedSourceTest {
   }
 
   @Test
+  fun aInputStreamCloses() {
+    runBlocking {
+      val source = RealBufferedSource(Buffer())
+      val input = source.inputStream()
+      input.close()
+      try {
+        source.aRequire(1L)
+        fail()
+      }
+      catch (e: IllegalStateException) {
+        assertEquals("closed", e.message)
+      }
+    }
+  }
+
+  @Test
   fun indexOfStopsReadingAtLimit() {
     val buffer = Buffer().writeUtf8("abcdef")
     val bufferedSource = RealBufferedSource(object : ForwardingSource(buffer) {
       override fun read(sink: Buffer, byteCount: Long): Long {
         return super.read(sink, Math.min(1L, byteCount))
       }
+      suspend override fun aRead(sink: Buffer, byteCount: Long): Long {
+        return super.aRead(sink, Math.min(1L, byteCount))
+      }
     })
     assertEquals(6L, buffer.size())
     assertEquals(-1L, bufferedSource.indexOf('e'.toByte(), 0L, 4L))
     assertEquals(2L, buffer.size())
+  }
+
+  @Test
+  fun aIndexOfStopsReadingAtLimit() {
+    runBlocking {
+      val buffer = Buffer().aWriteUtf8("abcdef")
+      val bufferedSource = RealBufferedSource(object : ForwardingSource(buffer) {
+        override fun read(sink: Buffer, byteCount: Long): Long {
+          return super.read(sink, Math.min(1L, byteCount))
+        }
+        suspend override fun aRead(sink: Buffer, byteCount: Long): Long {
+          return super.aRead(sink, Math.min(1L, byteCount))
+        }
+      })
+      assertEquals(6L, buffer.size())
+      assertEquals(-1L, bufferedSource.aIndexOf('e'.toByte(), 0L, 4L))
+      assertEquals(2L, buffer.size())
+    }
   }
 
   @Test
@@ -77,6 +115,20 @@ class RealBufferedSourceTest {
     assertEquals(2L, source.size())
   }
 
+
+  @Test
+  fun aRequireTracksBufferFirst() {
+    runBlocking {
+      val source = Buffer()
+      source.aWriteUtf8("bb")
+      val bufferedSource = RealBufferedSource(source)
+      bufferedSource.buffer().aWriteUtf8("aa")
+      bufferedSource.aRequire(2L)
+      assertEquals(2L, bufferedSource.buffer().size())
+      assertEquals(2L, source.size())
+    }
+  }
+
   @Test
   fun requireIncludesBufferBytes() {
     val source = Buffer()
@@ -85,6 +137,18 @@ class RealBufferedSourceTest {
     bufferedSource.buffer().writeUtf8("a")
     bufferedSource.require(2L)
     assertEquals("ab", bufferedSource.buffer().readUtf8(2L))
+  }
+
+  @Test
+  fun aRequireIncludesBufferBytes() {
+    runBlocking {
+      val source = Buffer()
+      source.aWriteUtf8("b")
+      val bufferedSource = RealBufferedSource(source)
+      bufferedSource.buffer().aWriteUtf8("a")
+      bufferedSource.aRequire(2L)
+      assertEquals("ab", bufferedSource.buffer().aReadUtf8(2L))
+    }
   }
 
   @Test
@@ -100,6 +164,20 @@ class RealBufferedSourceTest {
   }
 
   @Test
+  fun aRequireInsufficientData() {
+    runBlocking {
+      val source = Buffer()
+      source.aWriteUtf8("a")
+      val bufferedSource = RealBufferedSource(source)
+      try {
+        bufferedSource.aRequire(2L)
+        fail()
+      }
+      catch (expected: EOFException) {}
+    }
+  }
+
+  @Test
   fun requireReadsOneSegmentAtATime() {
     val source = Buffer()
     source.writeUtf8(repeat('a', Segment.SIZE))
@@ -108,6 +186,19 @@ class RealBufferedSourceTest {
     bufferedSource.require(2L)
     assertEquals(Segment.SIZE.toLong(), source.size())
     assertEquals(Segment.SIZE.toLong(), bufferedSource.buffer().size())
+  }
+
+  @Test
+  fun aRequireReadsOneSegmentAtATime() {
+    runBlocking {
+      val source = Buffer()
+      source.aWriteUtf8(repeat('a', Segment.SIZE))
+      source.aWriteUtf8(repeat('b', Segment.SIZE))
+      val bufferedSource = RealBufferedSource(source)
+      bufferedSource.aRequire(2L)
+      assertEquals(Segment.SIZE.toLong(), source.size())
+      assertEquals(Segment.SIZE.toLong(), bufferedSource.buffer().size())
+    }
   }
 
   @Test
@@ -122,6 +213,19 @@ class RealBufferedSourceTest {
   }
 
   @Test
+  fun aSkipReadsOneSegmentAtATime() {
+    runBlocking {
+      val source = Buffer()
+      source.aWriteUtf8(repeat('a', Segment.SIZE))
+      source.aWriteUtf8(repeat('b', Segment.SIZE))
+      val bufferedSource = RealBufferedSource(source)
+      bufferedSource.aSkip(2L)
+      assertEquals(Segment.SIZE.toLong(), source.size())
+      assertEquals(Segment.SIZE - 2L, bufferedSource.buffer().size())
+    }
+  }
+
+  @Test
   fun skipTracksBufferFirst() {
     val source = Buffer()
     source.writeUtf8("bb")
@@ -130,6 +234,19 @@ class RealBufferedSourceTest {
     bufferedSource.skip(2L)
     assertEquals(0L, bufferedSource.buffer().size())
     assertEquals(2L, source.size())
+  }
+
+  @Test
+  fun aSkipTracksBufferFirst() {
+    runBlocking {
+      val source = Buffer()
+      source.aWriteUtf8("bb")
+      val bufferedSource = RealBufferedSource(source)
+      bufferedSource.buffer().aWriteUtf8("aa")
+      bufferedSource.aSkip(2L)
+      assertEquals(0L, bufferedSource.buffer().size())
+      assertEquals(2L, source.size())
+    }
   }
 
   @Test
@@ -171,6 +288,35 @@ class RealBufferedSourceTest {
   }
 
   @Test
+  fun aOperationsAfterClose() {
+    runBlocking {
+      val source = Buffer()
+      val bufferedSource = RealBufferedSource(source)
+      bufferedSource.close()
+      try {
+        bufferedSource.aIndexOf(1.toByte())
+        fail()
+      }
+      catch (expected: IllegalStateException) {}
+      try {
+        bufferedSource.aSkip(1L)
+        fail()
+      }
+      catch (expected: IllegalStateException) {}
+      try {
+        bufferedSource.aReadByte()
+        fail()
+      }
+      catch (expected: IllegalStateException) {}
+      try {
+        bufferedSource.aReadByteString(10L)
+        fail()
+      }
+      catch (expected: IllegalStateException) {}
+    }
+  }
+
+  @Test
   fun readAllReadsOneSegmentAtATime() {
     val write1 = Buffer().writeUtf8(repeat('a', Segment.SIZE))
     val write2 = Buffer().writeUtf8(repeat('b', Segment.SIZE))
@@ -188,6 +334,28 @@ class RealBufferedSourceTest {
       "write(${write2}, ${write2.size()})",
       "write(${write3}, ${write3.size()})"
     )
+  }
+
+  @Test
+  fun aReadAllReadsOneSegmentAtATime() {
+    runBlocking {
+      val write1 = Buffer().aWriteUtf8(repeat('a', Segment.SIZE))
+      val write2 = Buffer().aWriteUtf8(repeat('b', Segment.SIZE))
+      val write3 = Buffer().aWriteUtf8(repeat('c', Segment.SIZE))
+      val source = Buffer().aWriteUtf8(
+        repeat('a', Segment.SIZE) +
+        repeat('b', Segment.SIZE) +
+        repeat('c', Segment.SIZE)
+      )
+      val mockSink = MockSink()
+      val bufferedSource = Oknio.buffer(source as Source)
+      assertEquals(Segment.SIZE * 3L, bufferedSource.aReadAll(mockSink))
+      mockSink.assertLog(
+        "write(${write1}, ${write1.size()})",
+        "write(${write2}, ${write2.size()})",
+        "write(${write3}, ${write3.size()})"
+      )
+    }
   }
 
 }
