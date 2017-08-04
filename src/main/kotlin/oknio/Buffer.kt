@@ -875,6 +875,83 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
 
   suspend override fun aIndexOf(b: Byte, from: Long, to: Long) = indexOf(b, from, to)
 
+  override fun indexOf(b: ByteString) = indexOf(b, 0L)
+
+  suspend override fun aIndexOf(b: ByteString) = aIndexOf(b, 0L)
+
+  override fun indexOf(b: ByteString, from: Long): Long {
+    val bytesSize = b.size()
+    if (bytesSize == 0) throw IllegalArgumentException("bytestring is empty")
+    if (from < 0L) throw IllegalArgumentException("fromIndex < 0")
+    var s = head ?: return -1L
+    var offset: Long
+    if (size - from < from) {
+      offset = size
+      while (offset > from) {
+        s = s.prev ?: throw NullPointerException()
+        offset -= s.limit - s.pos
+      }
+    }
+    else {
+      offset = 0L
+      var nextOffset = offset + s.limit - s.pos
+      while (nextOffset < from) {
+        s = s.next ?: throw NullPointerException()
+        offset = nextOffset
+        nextOffset = offset + s.limit - s.pos
+      }
+    }
+    val b0 = b.getByte(0)
+    val to2 = size - bytesSize + 1
+    var from2 = from
+    while (offset < to2) {
+      val data = s.data
+      var pos = (s.pos + from2 - offset).toInt()
+      while (pos < Math.min(s.limit.toLong(), s.pos + to2 - offset).toInt()) {
+        if (data[pos] == b0 && rangeEquals(s, pos + 1, b, 1, bytesSize)) {
+          return pos - s.pos + offset
+        }
+        ++pos
+      }
+      offset += s.limit - s.pos
+      from2 = offset
+      if (offset < to2) s = s.next ?: throw NullPointerException()
+    }
+    return -1L
+  }
+
+  suspend override fun aIndexOf(b: ByteString, from: Long) = indexOf(b, from)
+
+  private fun rangeEquals(segment: Segment, segmentPos: Int, b: ByteString,
+                          bOffset: Int, bytesLimit: Int): Boolean {
+    var s = segment
+    var pos = segmentPos
+    var limit = segment.limit
+    for (i in bOffset until bytesLimit) {
+      if (pos == limit) {
+        s = s.next ?: throw NullPointerException()
+        pos = s.pos
+        limit = s.limit
+      }
+      if (s.data[pos] != b.getByte(i)) return false
+      ++pos
+    }
+    return true
+  }
+
+  override fun rangeEquals(offset: Long, b: ByteString) = rangeEquals(offset, b, 0, b.size())
+
+  suspend override fun aRangeEquals(offset: Long, b: ByteString) = aRangeEquals(offset, b, 0, b.size())
+
+  override fun rangeEquals(offset: Long, b: ByteString, bOffset: Int, byteCount: Int): Boolean {
+    if (offset < 0L || bOffset < 0 || byteCount < 0 || size - offset < byteCount ||
+        b.size() - bOffset < byteCount) return false
+    return (0 until byteCount).none { getByte(offset + it) != b.getByte(bOffset + it) }
+  }
+
+  suspend override fun aRangeEquals(offset: Long, b: ByteString, bOffset: Int,
+                                    byteCount: Int) = rangeEquals(offset, b, bOffset, byteCount)
+
   override fun close() {}
 
   suspend override fun aClose() {}

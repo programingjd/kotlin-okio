@@ -135,6 +135,30 @@ interface BufferedSource: Source {
   @Throws(IOException::class)
   suspend fun aIndexOf(b: Byte, from: Long, to: Long): Long
 
+  @Throws(IOException::class)
+  fun indexOf(b: ByteString): Long
+
+  @Throws(IOException::class)
+  suspend fun aIndexOf(b: ByteString): Long
+
+  @Throws(IOException::class)
+  fun indexOf(b: ByteString, from: Long): Long
+
+  @Throws(IOException::class)
+  suspend fun aIndexOf(b: ByteString, from: Long): Long
+
+  @Throws(IOException::class)
+  fun rangeEquals(offset: Long, b: ByteString): Boolean
+
+  @Throws(IOException::class)
+  suspend fun aRangeEquals(offset: Long, b: ByteString): Boolean
+
+  @Throws(IOException::class)
+  fun rangeEquals(offset: Long, b: ByteString, bOffset: Int, byteCount: Int): Boolean
+
+  @Throws(IOException::class)
+  suspend fun aRangeEquals(offset: Long, b: ByteString,  bOffset: Int, byteCount: Int): Boolean
+
   fun inputStream(): InputStream
 
 }

@@ -11,4 +11,6 @@ interface Source: Closeable {
   @Throws(IOException::class)
   suspend fun aRead(sink: Buffer, byteCount: Long): Long
 
+  fun timeout(): Timeout
+
 }
