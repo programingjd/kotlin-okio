@@ -440,6 +440,13 @@ internal class RealBufferedSource(val source: Source) : BufferedSource {
     buffer.clear()
   }
 
+  suspend override fun aClose() {
+    if (closed) return
+    closed = true
+    source.aClose()
+    buffer.aClear()
+  }
+
   override fun timeout() = source.timeout()
 
   override fun toString(): String {

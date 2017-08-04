@@ -325,6 +325,15 @@ class Buffer: BufferedSource, BufferedSink, Cloneable {
     }
   }
 
+  suspend fun aClear() {
+    try {
+      aSkip(size)
+    }
+    catch (e: EOFException) {
+      throw AssertionError(e)
+    }
+  }
+
   override fun readUtf8(): String {
     try {
       return readString(size, UTF_8)
