@@ -298,7 +298,7 @@ class BufferedSinkTest {
   @Test
   fun writeSourcePropagatesEof() {
     forEachFactory { data, sink ->
-      val source = Buffer().writeUtf8("abcd")
+      val source: Source = Buffer().writeUtf8("abcd")
       try {
         sink.write(source, 8L)
         fail()
@@ -312,7 +312,7 @@ class BufferedSinkTest {
   fun aWriteSourcePropagatesEof() {
     forEachFactory { data, sink ->
       runBlocking {
-        val source = Buffer().aWriteUtf8("abcd")
+        val source: Source = Buffer().aWriteUtf8("abcd")
         try {
           sink.aWrite(source, 8L)
           fail()
