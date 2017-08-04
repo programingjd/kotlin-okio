@@ -11,9 +11,7 @@ internal class RealBufferedSource(val source: Source) : BufferedSource {
   val buffer = Buffer()
   var closed: Boolean = false
 
-  override fun buffer(): Buffer {
-    return buffer
-  }
+  override fun buffer() = buffer
 
   override fun read(sink: Buffer, byteCount: Long): Long {
     if (byteCount < 0L) throw IllegalArgumentException("byteCount < 0: ${byteCount}")
