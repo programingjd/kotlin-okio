@@ -1,5 +1,6 @@
 package oknio
 
+import kotlinx.coroutines.experimental.runBlocking
 import java.io.IOException
 import org.junit.Test
 
@@ -23,6 +24,22 @@ class RealBufferedSinkTest {
   }
 
   @Test
+  fun aInputStreamCloses() {
+    runBlocking {
+      val sink = RealBufferedSink(Buffer())
+      val out = sink.outputStream()
+      out.close()
+      try {
+        sink.aWriteUtf8("Hi!")
+        fail()
+      }
+      catch (e: IllegalStateException) {
+        assertEquals("closed", e.message)
+      }
+    }
+  }
+
+  @Test
   fun bufferedSinkEmitsTailWhenItIsComplete() {
     val sink = Buffer()
     val bufferedSink = RealBufferedSink(sink)
@@ -34,12 +51,36 @@ class RealBufferedSinkTest {
   }
 
   @Test
+  fun aBufferedSinkEmitsTailWhenItIsComplete() {
+    runBlocking {
+      val sink = Buffer()
+      val bufferedSink = RealBufferedSink(sink)
+      bufferedSink.aWriteUtf8(repeat('a', Segment.SIZE - 1))
+      assertEquals(0L, sink.size())
+      bufferedSink.aWriteByte(0)
+      assertEquals(Segment.SIZE.toLong(), sink.size())
+      assertEquals(0L, bufferedSink.buffer().size())
+    }
+  }
+
+  @Test
   fun bufferedSinkEmitMultipleSegments() {
     val sink = Buffer()
     val bufferedSink = RealBufferedSink(sink)
     bufferedSink.writeUtf8(repeat('a', Segment.SIZE * 4 - 1))
     assertEquals(Segment.SIZE * 3L, sink.size())
     assertEquals(Segment.SIZE - 1L, bufferedSink.buffer().size())
+  }
+
+  @Test
+  fun aBufferedSinkEmitMultipleSegments() {
+    runBlocking {
+      val sink = Buffer()
+      val bufferedSink = RealBufferedSink(sink)
+      bufferedSink.aWriteUtf8(repeat('a', Segment.SIZE * 4 - 1))
+      assertEquals(Segment.SIZE * 3L, sink.size())
+      assertEquals(Segment.SIZE - 1L, bufferedSink.buffer().size())
+    }
   }
 
   @Test
@@ -54,6 +95,19 @@ class RealBufferedSinkTest {
   }
 
   @Test
+  fun aBufferedSinkFlush() {
+    runBlocking {
+      val sink = Buffer()
+      val bufferedSink = RealBufferedSink(sink)
+      bufferedSink.aWriteByte('a'.toInt())
+      assertEquals(0L, sink.size())
+      bufferedSink.aFlush()
+      assertEquals(0L, bufferedSink.buffer().size())
+      assertEquals(1L, sink.size())
+    }
+  }
+
+  @Test
   fun bytesEmittedToSinkWithFlush() {
     val sink = Buffer()
     val bufferedSink = RealBufferedSink(sink)
@@ -63,11 +117,32 @@ class RealBufferedSinkTest {
   }
 
   @Test
+  fun aBytesEmittedToSinkWithFlush() {
+    runBlocking {
+      val sink = Buffer()
+      val bufferedSink = RealBufferedSink(sink)
+      bufferedSink.aWriteUtf8("abc")
+      bufferedSink.aFlush()
+      assertEquals(3L, sink.size())
+    }
+  }
+
+  @Test
   fun bytesNotEmittedToSinkWithoutFlush() {
     val sink = Buffer()
     val bufferedSink = RealBufferedSink(sink)
     bufferedSink.writeUtf8("abc")
     assertEquals(0L, sink.size())
+  }
+
+  @Test
+  fun aBytesNotEmittedToSinkWithoutFlush() {
+    runBlocking {
+      val sink = Buffer()
+      val bufferedSink = RealBufferedSink(sink)
+      bufferedSink.aWriteUtf8("abc")
+      assertEquals(0L, sink.size())
+    }
   }
 
   @Test
@@ -80,6 +155,17 @@ class RealBufferedSinkTest {
   }
 
   @Test
+  fun aBytesEmittedToSinkWithEmit() {
+    runBlocking {
+      val sink = Buffer()
+      val bufferedSink = RealBufferedSink(sink)
+      bufferedSink.aWriteUtf8("abc")
+      bufferedSink.aEmit()
+      assertEquals(3L, sink.size())
+    }
+  }
+
+  @Test
   fun completeSegmentsEmitted() {
     val sink = Buffer()
     val bufferedSink = RealBufferedSink(sink)
@@ -88,11 +174,31 @@ class RealBufferedSinkTest {
   }
 
   @Test
+  fun aCompleteSegmentsEmitted() {
+    runBlocking {
+      val sink = Buffer()
+      val bufferedSink = RealBufferedSink(sink)
+      bufferedSink.aWriteUtf8(repeat('a', Segment.SIZE * 3))
+      assertEquals(Segment.SIZE * 3L, sink.size())
+    }
+  }
+
+  @Test
   fun incompleteSegmentsNotEmitted() {
     val sink = Buffer()
     val bufferedSink = RealBufferedSink(sink)
     bufferedSink.writeUtf8(repeat('a', Segment.SIZE * 3 - 1))
     assertEquals(Segment.SIZE * 2L, sink.size())
+  }
+
+  @Test
+  fun aIncompleteSegmentsNotEmitted() {
+    runBlocking {
+      val sink = Buffer()
+      val bufferedSink = RealBufferedSink(sink)
+      bufferedSink.aWriteUtf8(repeat('a', Segment.SIZE * 3 - 1))
+      assertEquals(Segment.SIZE * 2L, sink.size())
+    }
   }
 
   @Test
@@ -110,6 +216,23 @@ class RealBufferedSinkTest {
   }
 
   @Test
+  fun aCloseWithExceptionWhenWriting() {
+    runBlocking {
+      val mockSink = MockSink()
+      mockSink.scheduleThrow(0, IOException())
+      val bufferedSink = RealBufferedSink(mockSink)
+      bufferedSink.aWriteByte('a'.toInt())
+      try {
+        bufferedSink.aClose()
+        fail()
+      }
+      catch (expected: IOException) {
+      }
+      mockSink.assertLog("write([text=a], 1)", "close()")
+    }
+  }
+
+  @Test
   fun closeWithExceptionWhenClosing() {
     val mockSink = MockSink()
     mockSink.scheduleThrow(1, IOException())
@@ -121,6 +244,23 @@ class RealBufferedSinkTest {
     }
     catch (expected: IOException) {}
     mockSink.assertLog("write([text=a], 1)", "close()")
+  }
+
+  @Test
+  fun aCloseWithExceptionWhenClosing() {
+    runBlocking {
+      val mockSink = MockSink()
+      mockSink.scheduleThrow(1, IOException())
+      val bufferedSink = RealBufferedSink(mockSink)
+      bufferedSink.aWriteByte('a'.toInt())
+      try {
+        bufferedSink.aClose()
+        fail()
+      }
+      catch (expected: IOException) {
+      }
+      mockSink.assertLog("write([text=a], 1)", "close()")
+    }
   }
 
   @Test
@@ -138,6 +278,25 @@ class RealBufferedSinkTest {
       assertEquals("first", expected.message)
     }
     mockSink.assertLog("write([text=a], 1)", "close()")
+  }
+
+  @Test
+  fun aCloseWithExceptionWhenWritingAndClosing() {
+    runBlocking {
+      val mockSink = MockSink()
+      mockSink.scheduleThrow(0, IOException("first"))
+      mockSink.scheduleThrow(1, IOException("second"))
+      val bufferedSink = RealBufferedSink(mockSink)
+      bufferedSink.aWriteByte('a'.toInt())
+      try {
+        bufferedSink.aClose()
+        fail()
+      }
+      catch (expected: IOException) {
+        assertEquals("first", expected.message)
+      }
+      mockSink.assertLog("write([text=a], 1)", "close()")
+    }
   }
 
   @Test
@@ -186,6 +345,41 @@ class RealBufferedSinkTest {
   }
 
   @Test
+  fun aOperationsAfterClose() {
+    runBlocking {
+      val mockSink = MockSink()
+      val bufferedSink = RealBufferedSink(mockSink)
+      bufferedSink.aWriteByte('a'.toInt())
+      bufferedSink.aClose()
+      try {
+        bufferedSink.aWriteByte('a'.toInt())
+        fail()
+      }
+      catch (expected: IllegalStateException) {}
+      try {
+        bufferedSink.aWrite(ByteArray(10))
+        fail()
+      }
+      catch (expected: IllegalStateException) {}
+      try {
+        bufferedSink.aEmitCompleteSegments()
+        fail()
+      }
+      catch (expected: IllegalStateException) {}
+      try {
+        bufferedSink.aEmit()
+        fail()
+      }
+      catch (expected: IllegalStateException) {}
+      try {
+        bufferedSink.aFlush()
+        fail()
+      }
+      catch (expected: IllegalStateException) {}
+    }
+  }
+
+  @Test
   fun writeAll() {
     val mockSink = MockSink()
     val bufferedSink = Oknio.buffer(mockSink)
@@ -197,12 +391,36 @@ class RealBufferedSinkTest {
   }
 
   @Test
+  fun aWriteAll() {
+    runBlocking {
+      val mockSink = MockSink()
+      val bufferedSink = Oknio.buffer(mockSink)
+      bufferedSink.buffer().aWriteUtf8("abc")
+      assertEquals(3L, bufferedSink.aWriteAll(Buffer().writeUtf8("def")))
+      assertEquals(6L, bufferedSink.buffer().size())
+      assertEquals("abcdef", bufferedSink.buffer().aReadUtf8(6))
+      mockSink.assertLog()
+    }
+  }
+
+  @Test
   fun writeAllExhausted() {
     val mockSink = MockSink()
     val bufferedSink = Oknio.buffer(mockSink)
     assertEquals(0L, bufferedSink.writeAll(Buffer()))
     assertEquals(0L, bufferedSink.buffer().size())
     mockSink.assertLog()
+  }
+
+  @Test
+  fun aWriteAllExhausted() {
+    runBlocking {
+      val mockSink = MockSink()
+      val bufferedSink = Oknio.buffer(mockSink)
+      assertEquals(0L, bufferedSink.aWriteAll(Buffer()))
+      assertEquals(0L, bufferedSink.buffer().size())
+      mockSink.assertLog()
+    }
   }
 
   @Test
@@ -223,6 +441,28 @@ class RealBufferedSinkTest {
       "write(${write2}, ${write2.size()})",
       "write(${write3}, ${write3.size()})"
     )
+  }
+
+  @Test
+  fun aWriteAllWritesOneSegmentAtATime() {
+    runBlocking {
+      val write1 = Buffer().aWriteUtf8(repeat('a', Segment.SIZE))
+      val write2 = Buffer().aWriteUtf8(repeat('b', Segment.SIZE))
+      val write3 = Buffer().aWriteUtf8(repeat('c', Segment.SIZE))
+      val source = Buffer().aWriteUtf8(
+        repeat('a', Segment.SIZE) +
+        repeat('b', Segment.SIZE) +
+        repeat('c', Segment.SIZE)
+      )
+      val mockSink = MockSink()
+      val bufferedSink = Oknio.buffer(mockSink)
+      assertEquals(Segment.SIZE * 3L, bufferedSink.aWriteAll(source))
+      mockSink.assertLog(
+        "write(${write1}, ${write1.size()})",
+        "write(${write2}, ${write2.size()})",
+        "write(${write3}, ${write3.size()})"
+      )
+    }
   }
 
 }
