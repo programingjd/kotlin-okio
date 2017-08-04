@@ -16,7 +16,7 @@ internal class Segment private constructor(val data: ByteArray,
   var next: Segment? = null
   var prev: Segment? = null
 
-  internal companion object {
+  companion object {
 
     val SIZE = 8192
     val SHARE_MINIMUM = 1024
